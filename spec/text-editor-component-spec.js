@@ -443,7 +443,8 @@ describe('TextEditorComponent', function () {
         eol: 'E',
         space: 'S',
         tab: 'T',
-        cr: 'C'
+        cr: 'C',
+        nonBreakingSpace: 'N'
       }
 
       beforeEach(async function () {
@@ -453,28 +454,28 @@ describe('TextEditorComponent', function () {
       })
 
       it('re-renders the lines when the showInvisibles config option changes', async function () {
-        editor.setText(' a line with tabs\tand spaces \n')
+        editor.setText(' a line with tabs\tand spaces \n')
         await nextViewUpdatePromise()
 
-        expect(component.lineNodeForScreenRow(0).textContent).toBe('' + invisibles.space + 'a line with tabs' + invisibles.tab + 'and spaces' + invisibles.space + invisibles.eol)
+        expect(component.lineNodeForScreenRow(0).textContent).toBe('' + invisibles.space + 'a line with' + invisibles.nonBreakingSpace + 'tabs' + invisibles.tab + 'and spaces' + invisibles.space + invisibles.eol)
 
         atom.config.set('editor.showInvisibles', false)
         await nextViewUpdatePromise()
 
-        expect(component.lineNodeForScreenRow(0).textContent).toBe(' a line with tabs and spaces ')
+        expect(component.lineNodeForScreenRow(0).textContent).toBe(' a line with tabs and spaces ')
 
         atom.config.set('editor.showInvisibles', true)
         await nextViewUpdatePromise()
 
-        expect(component.lineNodeForScreenRow(0).textContent).toBe('' + invisibles.space + 'a line with tabs' + invisibles.tab + 'and spaces' + invisibles.space + invisibles.eol)
+        expect(component.lineNodeForScreenRow(0).textContent).toBe('' + invisibles.space + 'a line with' + invisibles.nonBreakingSpace + 'tabs' + invisibles.tab + 'and spaces' + invisibles.space + invisibles.eol)
       })
 
       it('displays leading/trailing spaces, tabs, and newlines as visible characters', async function () {
-        editor.setText(' a line with tabs\tand spaces \n')
+        editor.setText(' a line with tabs\tand spaces \n')
 
         await nextViewUpdatePromise()
 
-        expect(component.lineNodeForScreenRow(0).textContent).toBe('' + invisibles.space + 'a line with tabs' + invisibles.tab + 'and spaces' + invisibles.space + invisibles.eol)
+        expect(component.lineNodeForScreenRow(0).textContent).toBe('' + invisibles.space + 'a line with' + invisibles.nonBreakingSpace + 'tabs' + invisibles.tab + 'and spaces' + invisibles.space + invisibles.eol)
 
         let leafNodes = getLeafNodes(component.lineNodeForScreenRow(0))
         expect(leafNodes[0].classList.contains('invisible-character')).toBe(true)

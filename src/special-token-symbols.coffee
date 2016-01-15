@@ -3,4 +3,5 @@ module.exports = {
   HardTab: Symbol('HardTab')
   PairedCharacter: Symbol('PairedCharacter')
   SoftWrapIndent: Symbol('SoftWrapIndent')
+  NonBreakingSpace: Symbol('NonBreakingSpace')
 }
