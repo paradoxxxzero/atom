@@ -661,10 +661,12 @@ class Pane extends Model
       @parent.replaceChild(this, new PaneAxis({@container, orientation, children: [this], @flexScale}))
       @setFlexScale(1)
 
-    newPane = new Pane(extend({@applicationDelegate, @deserializerManager, @config}, params))
+    newPane = new Pane(extend({@applicationDelegate, @notificationManager, @deserializerManager, @config}, params))
     switch side
       when 'before' then @parent.insertChildBefore(this, newPane)
       when 'after' then @parent.insertChildAfter(this, newPane)
+
+    @moveItemToPane(@activeItem, newPane) if params?.moveActiveItem
 
     newPane.activate()
     newPane
@@ -711,7 +713,7 @@ class Pane extends Model
     if @parent.orientation is 'vertical'
       bottommostSibling = last(@parent.children)
       if bottommostSibling instanceof PaneAxis
-        @splitRight()
+        @splitDown()
       else
         bottommostSibling
     else

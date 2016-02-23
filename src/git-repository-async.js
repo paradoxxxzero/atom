@@ -202,32 +202,35 @@ export default class GitRepositoryAsync {
 
     workingDirectory = workingDirectory.replace(/\/$/, '')
 
+    // Depending on where the paths come from, they may have a '/private/'
+    // prefix. Standardize by stripping that out.
+    _path = _path.replace(/^\/private\//i, '/')
+    workingDirectory = workingDirectory.replace(/^\/private\//i, '/')
+
+    const originalPath = _path
+    const originalWorkingDirectory = workingDirectory
     if (this.isCaseInsensitive) {
       _path = _path.toLowerCase()
       workingDirectory = workingDirectory.toLowerCase()
     }
 
-    // Depending on where the paths come from, they may have a '/private/'
-    // prefix. Standardize by stripping that out.
-    _path = _path.replace(/^\/private\//, '/')
-    workingDirectory = workingDirectory.replace(/^\/private\//, '/')
-
-    const originalPath = _path
     if (_path.indexOf(workingDirectory) === 0) {
-      return originalPath.substring(workingDirectory.length + 1)
+      return originalPath.substring(originalWorkingDirectory.length + 1)
     } else if (_path === workingDirectory) {
       return ''
     }
 
     if (openedWorkingDirectory) {
+      openedWorkingDirectory = openedWorkingDirectory.replace(/\/$/, '')
+      openedWorkingDirectory = openedWorkingDirectory.replace(/^\/private\//i, '/')
+
+      const originalOpenedWorkingDirectory = openedWorkingDirectory
       if (this.isCaseInsensitive) {
         openedWorkingDirectory = openedWorkingDirectory.toLowerCase()
       }
-      openedWorkingDirectory = openedWorkingDirectory.replace(/\/$/, '')
-      openedWorkingDirectory = openedWorkingDirectory.replace(/^\/private\//, '/')
 
       if (_path.indexOf(openedWorkingDirectory) === 0) {
-        return originalPath.substring(openedWorkingDirectory.length + 1)
+        return originalPath.substring(originalOpenedWorkingDirectory.length + 1)
       } else if (_path === openedWorkingDirectory) {
         return ''
       }
@@ -456,7 +459,10 @@ export default class GitRepositoryAsync {
   // information.
   getDirectoryStatus (directoryPath) {
     return this.relativizeToWorkingDirectory(directoryPath)
-      .then(relativePath => this._getStatus([relativePath]))
+      .then(relativePath => {
+        const pathspec = relativePath + '/**'
+        return this._getStatus([pathspec])
+      })
       .then(statuses => {
         return Promise.all(statuses.map(s => s.statusBit())).then(bits => {
           return bits
@@ -800,7 +806,7 @@ export default class GitRepositoryAsync {
     }
 
     return Promise.all(projectPathsPromises)
-      .then(paths => paths.filter(p => p.length > 0))
+      .then(paths => paths.map(p => p.length > 0 ? p + '/**' : '*'))
       .then(projectPaths => {
         return this._getStatus(projectPaths.length > 0 ? projectPaths : null)
       })
@@ -1032,7 +1038,7 @@ export default class GitRepositoryAsync {
     return this.getRepo()
       .then(repo => {
         const opts = {
-          flags: Git.Status.OPT.INCLUDE_UNTRACKED | Git.Status.OPT.RECURSE_UNTRACKED_DIRS | Git.Status.OPT.DISABLE_PATHSPEC_MATCH
+          flags: Git.Status.OPT.INCLUDE_UNTRACKED | Git.Status.OPT.RECURSE_UNTRACKED_DIRS
         }
 
         if (paths) {

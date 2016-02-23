@@ -23,9 +23,7 @@ module.exports = ({blobStore}) ->
     enablePersistence: true
   })
 
-  atom.displayWindow().then ->
-    atom.startEditorWindow()
-    require('electron').ipcRenderer.send('window-command', 'window:loaded')
+  atom.startEditorWindow().then ->
 
     # Workaround for focus getting cleared upon window creation
     windowFocused = ->

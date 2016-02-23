@@ -1,4 +1,5 @@
 _ = require 'underscore-plus'
+url = require 'url'
 path = require 'path'
 {join} = path
 {Emitter, Disposable, CompositeDisposable} = require 'event-kit'
@@ -47,6 +48,8 @@ class Workspace extends Model
       left: new PanelContainer({location: 'left'})
       right: new PanelContainer({location: 'right'})
       bottom: new PanelContainer({location: 'bottom'})
+      header: new PanelContainer({location: 'header'})
+      footer: new PanelContainer({location: 'footer'})
       modal: new PanelContainer({location: 'modal'})
 
     @subscribeToEvents()
@@ -66,6 +69,8 @@ class Workspace extends Model
       left: new PanelContainer({location: 'left'})
       right: new PanelContainer({location: 'right'})
       bottom: new PanelContainer({location: 'bottom'})
+      header: new PanelContainer({location: 'header'})
+      footer: new PanelContainer({location: 'footer'})
       modal: new PanelContainer({location: 'modal'})
 
     @originalFontSize = null
@@ -389,11 +394,11 @@ class Workspace extends Model
   #     initially. Defaults to `0`.
   #   * `initialColumn` A {Number} indicating which column to move the cursor to
   #     initially. Defaults to `0`.
-  #   * `split` Either 'left', 'right', 'top' or 'bottom'.
+  #   * `split` Either 'left', 'right', 'up' or 'down'.
   #     If 'left', the item will be opened in leftmost pane of the current active pane's row.
-  #     If 'right', the item will be opened in the rightmost pane of the current active pane's row.
-  #     If 'up', the item will be opened in topmost pane of the current active pane's row.
-  #     If 'down', the item will be opened in the bottommost pane of the current active pane's row.
+  #     If 'right', the item will be opened in the rightmost pane of the current active pane's row. If only one pane exists in the row, a new pane will be created.
+  #     If 'up', the item will be opened in topmost pane of the current active pane's column.
+  #     If 'down', the item will be opened in the bottommost pane of the current active pane's column. If only one pane exists in the column, a new pane will be created.
   #   * `activatePane` A {Boolean} indicating whether to call {Pane::activate} on
   #     containing pane. Defaults to `true`.
   #   * `activateItem` A {Boolean} indicating whether to call {Pane::activateItem}
@@ -408,6 +413,14 @@ class Workspace extends Model
     searchAllPanes = options.searchAllPanes
     split = options.split
     uri = @project.resolvePath(uri)
+
+    if not atom.config.get('core.allowPendingPaneItems')
+      options.pending = false
+
+    # Avoid adding URLs as recent documents to work-around this Spotlight crash:
+    # https://github.com/atom/atom/issues/10071
+    if uri? and not url.parse(uri).protocol?
+      @applicationDelegate.addRecentDocument(uri)
 
     pane = @paneContainer.paneForURI(uri) if searchAllPanes
     pane ?= switch split
@@ -463,7 +476,8 @@ class Workspace extends Model
     activateItem = options.activateItem ? true
 
     if uri?
-      item = pane.itemForURI(uri)
+      if item = pane.itemForURI(uri)
+        item.terminatePendingState?() if item.isPending?() and not options.pending
       item ?= opener(uri, options) for opener in @getOpeners() when not item
 
     try
@@ -833,6 +847,44 @@ class Workspace extends Model
   # Returns a {Panel}
   addTopPanel: (options) ->
     @addPanel('top', options)
+
+  # Essential: Get an {Array} of all the panel items in the header.
+  getHeaderPanels: ->
+    @getPanels('header')
+
+  # Essential: Adds a panel item to the header.
+  #
+  # * `options` {Object}
+  #   * `item` Your panel content. It can be DOM element, a jQuery element, or
+  #     a model with a view registered via {ViewRegistry::addViewProvider}. We recommend the
+  #     latter. See {ViewRegistry::addViewProvider} for more information.
+  #   * `visible` (optional) {Boolean} false if you want the panel to initially be hidden
+  #     (default: true)
+  #   * `priority` (optional) {Number} Determines stacking order. Lower priority items are
+  #     forced closer to the edges of the window. (default: 100)
+  #
+  # Returns a {Panel}
+  addHeaderPanel: (options) ->
+    @addPanel('header', options)
+
+  # Essential: Get an {Array} of all the panel items in the footer.
+  getFooterPanels: ->
+    @getPanels('footer')
+
+  # Essential: Adds a panel item to the footer.
+  #
+  # * `options` {Object}
+  #   * `item` Your panel content. It can be DOM element, a jQuery element, or
+  #     a model with a view registered via {ViewRegistry::addViewProvider}. We recommend the
+  #     latter. See {ViewRegistry::addViewProvider} for more information.
+  #   * `visible` (optional) {Boolean} false if you want the panel to initially be hidden
+  #     (default: true)
+  #   * `priority` (optional) {Number} Determines stacking order. Lower priority items are
+  #     forced closer to the edges of the window. (default: 100)
+  #
+  # Returns a {Panel}
+  addFooterPanel: (options) ->
+    @addPanel('footer', options)
 
   # Essential: Get an {Array} of all the modal panel items
   getModalPanels: ->

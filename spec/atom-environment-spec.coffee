@@ -152,6 +152,8 @@ describe "AtomEnvironment", ->
       atom.enablePersistence = false
 
     it "selects the state based on the current project paths", ->
+      jasmine.useRealClock()
+
       [dir1, dir2] = [temp.mkdirSync("dir1-"), temp.mkdirSync("dir2-")]
 
       loadSettings = _.extend atom.getLoadSettings(),
@@ -159,20 +161,36 @@ describe "AtomEnvironment", ->
         windowState: null
 
       spyOn(atom, 'getLoadSettings').andCallFake -> loadSettings
-      spyOn(atom.getStorageFolder(), 'getPath').andReturn(temp.mkdirSync("storage-dir-"))
+      spyOn(atom, 'serialize').andReturn({stuff: 'cool'})
 
-      atom.state.stuff = "cool"
       atom.project.setPaths([dir1, dir2])
-      atom.saveStateSync()
+      # State persistence will fail if other Atom instances are running
+      waitsForPromise ->
+        atom.stateStore.connect().then (isConnected) ->
+          expect(isConnected).toBe true
 
-      atom.state = {}
-      atom.loadStateSync()
-      expect(atom.state.stuff).toBeUndefined()
+      waitsForPromise ->
+        atom.saveState().then ->
+          atom.loadState().then (state) ->
+            expect(state).toBeNull()
 
-      loadSettings.initialPaths = [dir2, dir1]
-      atom.state = {}
-      atom.loadStateSync()
-      expect(atom.state.stuff).toBe("cool")
+      waitsForPromise ->
+        loadSettings.initialPaths = [dir2, dir1]
+        atom.loadState().then (state) ->
+          expect(state).toEqual({stuff: 'cool'})
+
+    it "saves state on keydown and mousedown events", ->
+      spyOn(atom, 'saveState')
+
+      keydown = new KeyboardEvent('keydown')
+      atom.document.dispatchEvent(keydown)
+      advanceClock atom.saveStateDebounceInterval
+      expect(atom.saveState).toHaveBeenCalled()
+
+      mousedown = new MouseEvent('mousedown')
+      atom.document.dispatchEvent(mousedown)
+      advanceClock atom.saveStateDebounceInterval
+      expect(atom.saveState).toHaveBeenCalled()
 
   describe "openInitialEmptyEditorIfNecessary", ->
     describe "when there are no paths set", ->
@@ -230,23 +248,6 @@ describe "AtomEnvironment", ->
 
       atomEnvironment.destroy()
 
-    it "saves the serialized state of the window so it can be deserialized after reload", ->
-      atomEnvironment = new AtomEnvironment({applicationDelegate: atom.applicationDelegate, window, document})
-      spyOn(atomEnvironment, 'saveStateSync')
-
-      workspaceState = atomEnvironment.workspace.serialize()
-      grammarsState = {grammarOverridesByPath: atomEnvironment.grammars.grammarOverridesByPath}
-      projectState = atomEnvironment.project.serialize()
-
-      atomEnvironment.unloadEditorWindow()
-
-      expect(atomEnvironment.state.workspace).toEqual workspaceState
-      expect(atomEnvironment.state.grammars).toEqual grammarsState
-      expect(atomEnvironment.state.project).toEqual projectState
-      expect(atomEnvironment.saveStateSync).toHaveBeenCalled()
-
-      atomEnvironment.destroy()
-
   describe "::destroy()", ->
     it "does not throw exceptions when unsubscribing from ipc events (regression)", ->
       configDirPath = temp.mkdirSync()
@@ -258,6 +259,7 @@ describe "AtomEnvironment", ->
       }
       atomEnvironment = new AtomEnvironment({applicationDelegate: atom.applicationDelegate, window, document: fakeDocument})
       spyOn(atomEnvironment.packages, 'getAvailablePackagePaths').andReturn []
+      spyOn(atomEnvironment, 'displayWindow').andReturn Promise.resolve()
       atomEnvironment.startEditorWindow()
       atomEnvironment.unloadEditorWindow()
       atomEnvironment.destroy()
@@ -272,6 +274,14 @@ describe "AtomEnvironment", ->
         pathToOpen = __filename
         atom.openLocations([{pathToOpen}])
         expect(atom.project.getPaths()[0]).toBe __dirname
+
+      describe "then a second path is opened with forceAddToWindow", ->
+        it "adds the second path to the project's paths", ->
+          firstPathToOpen = __dirname
+          secondPathToOpen = path.resolve(__dirname, './fixtures')
+          atom.openLocations([{pathToOpen: firstPathToOpen}])
+          atom.openLocations([{pathToOpen: secondPathToOpen, forceAddToWindow: true}])
+          expect(atom.project.getPaths()).toEqual([firstPathToOpen, secondPathToOpen])
 
     describe "when the opened path does not exist but its parent directory does", ->
       it "adds the parent directory to the project paths", ->

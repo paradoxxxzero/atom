@@ -84,7 +84,9 @@
     setupCsonCache(CompileCache.getCacheDirectory())
 
     var initialize = require(loadSettings.windowInitializationScript)
-    initialize({blobStore: blobStore})
+    return initialize({blobStore: blobStore}).then(function () {
+      require('electron').ipcRenderer.send('window-command', 'window:loaded')
+    })
   }
 
   function setupCsonCache (cacheDir) {
@@ -112,16 +114,12 @@
   function profileStartup (loadSettings, initialTime) {
     function profile () {
       console.profile('startup')
-      try {
-        var startTime = Date.now()
-        setupWindow(loadSettings)
+      var startTime = Date.now()
+      setupWindow(loadSettings).then(function () {
         setLoadTime(Date.now() - startTime + initialTime)
-      } catch (error) {
-        handleSetupError(error)
-      } finally {
         console.profileEnd('startup')
         console.log('Switch to the Profiles tab to view the created startup profile')
-      }
+      })
     }
 
     var currentWindow = require('electron').remote.getCurrentWindow()
