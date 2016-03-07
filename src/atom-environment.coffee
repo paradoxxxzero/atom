@@ -265,8 +265,6 @@ class AtomEnvironment extends Model
       new PaneAxisElement().initialize(model, env)
     @views.addViewProvider Pane, (model, env) ->
       new PaneElement().initialize(model, env)
-    @views.addViewProvider TextEditor, (model, env) ->
-      new TextEditorElement().initialize(model, env)
     @views.addViewProvider(Gutter, createGutterView)
 
   registerDefaultOpeners: ->
@@ -676,7 +674,7 @@ class AtomEnvironment extends Model
         @document.body.appendChild(@views.getView(@workspace))
         @backgroundStylesheet?.remove()
 
-        @watchProjectPath()
+        @watchProjectPaths()
 
         @packages.activate()
         @keymaps.loadUserKeymap()
@@ -808,7 +806,7 @@ class AtomEnvironment extends Model
     @themes.load()
 
   # Notify the browser project of the window's current project path
-  watchProjectPath: ->
+  watchProjectPaths: ->
     @disposables.add @project.onDidChangePaths =>
       @applicationDelegate.setRepresentedDirectoryPaths(@project.getPaths())
 
